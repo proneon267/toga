@@ -10,6 +10,8 @@ from System.Media import SystemSounds
 from System.Net import SecurityProtocolType, ServicePointManager
 from System.Windows.Threading import Dispatcher
 
+from toga.constants import WindowState
+
 from .libs.proactor import WinformsProactorEventLoop
 from .libs.wrapper import WeakrefCallable
 from .screens import Screen as ScreenImpl
@@ -257,13 +259,16 @@ class App:
         window._impl.native.Activate()
 
     ######################################################################
-    # Full screen control
+    # Presentation mode controls
     ######################################################################
 
-    def enter_full_screen(self, windows):
-        for window in windows:
-            window._impl.set_full_screen(True)
+    def enter_presentation_mode(self, screen_window_dict):
+        for screen, window in screen_window_dict.items():
+            window._impl._before_presentation_mode_screen = window.screen
+            window.screen = screen
+            window._impl.set_window_state(WindowState.PRESENTATION)
 
-    def exit_full_screen(self, windows):
-        for window in windows:
-            window._impl.set_full_screen(False)
+    def exit_presentation_mode(self):
+        for window in self.interface.windows:
+            if window.state == WindowState.PRESENTATION:
+                window._impl.set_window_state(WindowState.NORMAL)

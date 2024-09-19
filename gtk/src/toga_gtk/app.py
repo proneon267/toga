@@ -5,6 +5,7 @@ import gbulb
 
 from toga.app import App as toga_App
 from toga.command import Separator
+from toga.constants import WindowState
 
 from .keys import gtk_accel
 from .libs import IS_WAYLAND, TOGA_DEFAULT_STYLES, Gdk, Gio, GLib, Gtk
@@ -234,13 +235,16 @@ class App:
         window._impl.native.present()
 
     ######################################################################
-    # Full screen control
+    # Presentation mode controls
     ######################################################################
 
-    def enter_full_screen(self, windows):
-        for window in windows:
-            window._impl.set_full_screen(True)
+    def enter_presentation_mode(self, screen_window_dict):
+        for screen, window in screen_window_dict.items():
+            window._impl._before_presentation_mode_screen = window.screen
+            window.screen = screen
+            window._impl.set_window_state(WindowState.PRESENTATION)
 
-    def exit_full_screen(self, windows):
-        for window in windows:
-            window._impl.set_full_screen(False)
+    def exit_presentation_mode(self):
+        for window in self.interface.windows:
+            if window.state == WindowState.PRESENTATION:
+                window._impl.set_window_state(WindowState.NORMAL)

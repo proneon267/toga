@@ -23,8 +23,17 @@ class WindowProbe(BaseProbe, DialogsMixin):
         self.native = window._impl.native
         assert isinstance(self.native, Gtk.Window)
 
-    async def wait_for_window(self, message, minimize=False, full_screen=False):
-        await self.redraw(message, delay=0.5 if (full_screen or minimize) else 0.1)
+    async def wait_for_window(
+        self,
+        message,
+        minimize=False,
+        full_screen=False,
+        rapid_state_switching=False,
+    ):
+        await self.redraw(
+            message,
+            delay=(0.5 if (full_screen or minimize) else 0.1),
+        )
 
     def close(self):
         if self.is_closable:
@@ -37,8 +46,8 @@ class WindowProbe(BaseProbe, DialogsMixin):
         return (content_allocation.width, content_allocation.height)
 
     @property
-    def is_full_screen(self):
-        return bool(self.native.get_window().get_state() & Gdk.WindowState.FULLSCREEN)
+    def presentation_content_size(self):
+        return self.content_size
 
     @property
     def is_resizable(self):
@@ -50,7 +59,7 @@ class WindowProbe(BaseProbe, DialogsMixin):
 
     @property
     def is_minimized(self):
-        return bool(self.native.get_window().get_state() & Gdk.WindowState.ICONIFIED)
+        return bool(self.impl._window_state_flags & Gdk.WindowState.ICONIFIED)
 
     def minimize(self):
         self.native.iconify()

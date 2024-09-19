@@ -11,6 +11,7 @@ from org.beeware.android import IPythonApp, MainActivity
 
 import toga
 from toga.command import Group, Separator
+from toga.constants import WindowState
 from toga.dialogs import InfoDialog
 
 from .libs import events
@@ -314,14 +315,18 @@ class App:
         pass
 
     ######################################################################
-    # Full screen control
+    # Presentation mode controls
     ######################################################################
 
-    def enter_full_screen(self, windows):
-        pass
+    def enter_presentation_mode(self, screen_window_dict):
+        for screen, window in screen_window_dict.items():
+            # There is only a single window on android and moving between
+            # screens is not supported.
+            window._impl.set_window_state(WindowState.PRESENTATION)
 
-    def exit_full_screen(self, windows):
-        pass
+    def exit_presentation_mode(self):
+        # There is only a single window on android.
+        self.interface.main_window._impl.set_window_state(WindowState.NORMAL)
 
     ######################################################################
     # Platform-specific APIs

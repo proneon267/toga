@@ -13,6 +13,7 @@ from rubicon.objc.eventloop import CocoaLifecycle, EventLoopPolicy
 
 import toga
 from toga.command import Command, Group, Separator
+from toga.constants import WindowState
 from toga.handlers import NativeHandler
 
 from .command import Command as CommandImpl, submenu_for_group
@@ -29,7 +30,6 @@ from .libs import (
     NSCursor,
     NSMenu,
     NSMenuItem,
-    NSNumber,
     NSScreen,
 )
 from .screens import Screen as ScreenImpl
@@ -369,34 +369,16 @@ class App:
         window._impl.native.makeKeyAndOrderFront(window._impl.native)
 
     ######################################################################
-    # Full screen control
+    # Presentation mode controls
     ######################################################################
 
-    def enter_full_screen(self, windows):
-        opts = NSMutableDictionary.alloc().init()
-        opts.setObject(
-            NSNumber.numberWithBool(True), forKey="NSFullScreenModeAllScreens"
-        )
+    def enter_presentation_mode(self, screen_window_dict):
+        for screen, window in screen_window_dict.items():
+            window._impl._before_presentation_mode_screen = window.screen
+            window.screen = screen
+            window._impl.set_window_state(WindowState.PRESENTATION)
 
-        for window, screen in zip(windows, NSScreen.screens):
-            # The widgets are actually added to window._impl.container.native, instead of
-            # window.content._impl.native. And window._impl.native.contentView is
-            # window._impl.container.native. Hence, we need to go fullscreen on
-            # window._impl.container.native instead.
-            window._impl.container.native.enterFullScreenMode(screen, withOptions=opts)
-            # Going full screen causes the window content to be re-homed
-            # in a NSFullScreenWindow; teach the new parent window
-            # about its Toga representations.
-            window._impl.container.native.window._impl = window._impl
-            window._impl.container.native.window.interface = window
-            window.content.refresh()
-
-    def exit_full_screen(self, windows):
-        opts = NSMutableDictionary.alloc().init()
-        opts.setObject(
-            NSNumber.numberWithBool(True), forKey="NSFullScreenModeAllScreens"
-        )
-
-        for window in windows:
-            window._impl.container.native.exitFullScreenModeWithOptions(opts)
-            window.content.refresh()
+    def exit_presentation_mode(self):
+        for window in self.interface.windows:
+            if window.state == WindowState.PRESENTATION:
+                window._impl.set_window_state(WindowState.NORMAL)

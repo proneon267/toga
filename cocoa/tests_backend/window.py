@@ -22,10 +22,20 @@ class WindowProbe(BaseProbe, DialogsMixin):
         self.native = window._impl.native
         assert isinstance(self.native, NSWindow)
 
-    async def wait_for_window(self, message, minimize=False, full_screen=False):
+    async def wait_for_window(
+        self,
+        message,
+        minimize=False,
+        full_screen=False,
+        rapid_state_switching=False,
+    ):
         await self.redraw(
             message,
-            delay=0.75 if full_screen else 0.5 if minimize else 0.1,
+            delay=(
+                0.75
+                if rapid_state_switching
+                else 0.75 if full_screen else 0.5 if minimize else 0.1
+            ),
         )
 
     def close(self):
@@ -39,8 +49,11 @@ class WindowProbe(BaseProbe, DialogsMixin):
         )
 
     @property
-    def is_full_screen(self):
-        return bool(self.native.styleMask & NSWindowStyleMask.FullScreen)
+    def presentation_content_size(self):
+        return (
+            self.window.content._impl.native.frame.size.width,
+            self.window.content._impl.native.frame.size.height,
+        )
 
     @property
     def is_resizable(self):
