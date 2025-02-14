@@ -1,3 +1,6 @@
+import inspect
+import json
+import sys
 from http.cookiejar import CookieJar
 
 from travertino.size import at_least
@@ -8,8 +11,45 @@ from ..libs import GLib, WebKit2
 from .base import Widget
 
 
+def add(a, b):
+    return a + b
+
+
 class WebView(Widget):
     """GTK WebView implementation."""
+
+    def sub(self, a, b):
+        return a - b
+
+    def register_handler(self, handler_method):
+        print(inspect.ismethod(handler_method))
+
+        # if inspect.isfunction(handler_method):
+        handler_signature = inspect.signature(handler_method)
+        handler_parameters = handler_signature.parameters
+        parameter_names = [
+            parameter_name for parameter_name, parameter in handler_parameters.items()
+        ]
+        print(str(handler_signature) + "\n" + str(handler_parameters))
+        self.content_manager.add_script(
+            WebKit2.UserScript.new(
+                (
+                    f"window.python.{handler_method.__name__} = "
+                    f"function {handler_method.__name__}"
+                    f"({', '.join(parameter_names)})"
+                    "{"
+                    "\n\tconst message = JSON.stringify({"
+                    "request_id: `${generateUUID()}`,"
+                    f'method: "{handler_method.__name__}",'
+                    f"args: [{', '.join(parameter_names)}]"
+                    "})"
+                    "\n\twindow.python_handler.postMessage(message)"
+                    "\n}"
+                ),
+                WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit2.UserScriptInjectionTime.START,
+            )
+        )
 
     def create(self):
         if WebKit2 is None:  # pragma: no cover
@@ -20,7 +60,52 @@ class WebView(Widget):
                 "for details."
             )
 
-        self.native = WebKit2.WebView()
+        def on_message_received(webview, js_message):
+            print("Message Received from JS")
+            reply = "Python Received message from JS"
+            # self.interface.evaluate_javascript(
+            #     f"window.python._receiveResult({json.dumps(reply)});"
+            # )
+            print(js_message.get_js_value().is_string())
+            message = js_message.get_js_value().to_string()
+            parsed = json.loads(message)
+            # python_method = getattr(self, parsed.get("method"))
+            # python_method_args = parsed.get("args")
+            # res = python_method(*python_method_args)
+
+            print(json.dumps(message))
+            # print("jkhkhkhkjh")
+
+        self.content_manager = WebKit2.UserContentManager()
+        self.content_manager.register_script_message_handler("python_handler")
+        self.content_manager.connect(
+            "script-message-received::python_handler", on_message_received
+        )
+        self.content_manager.add_script(
+            WebKit2.UserScript.new(
+                """
+                function generateUUID() {
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                        return v.toString(16);
+                    });
+                }
+                window.python_handler = window.webkit.messageHandlers.python_handler
+                window.python = {
+                    _receiveResult: function(result) {
+                        console.log("Result from Python:", result);
+                        alert("Result from Python: " + result);
+                    }
+                };
+                """,
+                WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit2.UserScriptInjectionTime.START,
+            )
+        )
+        self.register_handler(self.sub)
+        self.native = WebKit2.WebView.new_with_user_content_manager(
+            self.content_manager
+        )
 
         settings = self.native.get_settings()
         settings.set_property("enable-developer-extras", True)
