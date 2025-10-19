@@ -891,6 +891,47 @@ else:
             )
         ],
     )
+    async def test_resize_in_window_state(second_window, second_window_probe, state):
+        second_window.content = toga.Box(style=Pack(background_color=CORNFLOWERBLUE))
+        second_window.show()
+        # Wait for window animation before assertion.
+        await second_window_probe.wait_for_window("Secondary window is shown")
+
+        # Set the window state:
+        second_window.state = state
+        # Wait for window animation before assertion.
+        await second_window_probe.wait_for_window(
+            f"Secondary window is in {state}", state=state
+        )
+        assert second_window_probe.instantaneous_state == state
+
+        # Resize the window
+        second_window.size = (800, 600)
+        # Wait for window animation before assertion.
+        await second_window_probe.wait_for_window(
+            f"Secondary window is in {state}", state=state
+        )
+        assert second_window.size == (800, 600)
+
+    @pytest.mark.parametrize(
+        "state",
+        [
+            WindowState.NORMAL,
+            WindowState.MINIMIZED,
+            WindowState.MAXIMIZED,
+            WindowState.FULLSCREEN,
+            WindowState.PRESENTATION,
+        ],
+    )
+    @pytest.mark.parametrize(
+        "second_window_class, second_window_kwargs",
+        [
+            (
+                toga.Window,
+                {"title": "Secondary Window", "position": (200, 150)},
+            )
+        ],
+    )
     async def test_window_state_same_as_current_without_intermediate_states(
         app_probe, second_window, second_window_probe, state
     ):
