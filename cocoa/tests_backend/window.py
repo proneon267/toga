@@ -1,4 +1,5 @@
 import asyncio
+import platform
 
 from rubicon.objc import objc_id, send_message
 
@@ -46,6 +47,13 @@ class WindowProbe(BaseProbe, DialogsMixin):
                 try:
                     assert self.instantaneous_state == state
                     assert self.window._impl._pending_state_transition is None
+                    if (
+                        platform.machine() == "x86_64"
+                        and state == WindowState.MAXIMIZED
+                    ):
+                        # Add a slight delay to ensure window properties like
+                        # `size` are updated according to the new state.
+                        await self.redraw(delay=0.2)
                     return
                 except AssertionError as e:
                     exception = e
