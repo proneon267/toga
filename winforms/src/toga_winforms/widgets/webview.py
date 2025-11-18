@@ -135,6 +135,31 @@ class WebView(Widget):
             settings.IsSwipeNavigationEnabled = False
             settings.IsZoomControlEnabled = True
 
+            bridge_script = (
+                """
+            function receive_message(event) {
+                message = event.data;
+                handle_py_msg(message);
+            }
+            function send_message(message) {
+                chrome.webview.postMessage(message);
+            }
+            chrome.webview.addEventListener('message', receive_message);
+            """
+                + self.interface.handle_py_msg_script
+            )
+
+            def callback(task):
+                self.bridge_script_id = task.Result
+
+            task_scheduler = TaskScheduler.FromCurrentSynchronizationContext()
+            self.native.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                bridge_script
+            ).ContinueWith(Action[Task[String]](callback), task_scheduler)
+            self.native.CoreWebView2.WebMessageReceived += WeakrefCallable(
+                self.receive_message
+            )
+
             for task in self.pending_tasks:
                 task()
             self.pending_tasks = None
@@ -177,6 +202,16 @@ class WebView(Widget):
         if self.loaded_future:
             self.loaded_future.set_result(None)
             self.loaded_future = None
+
+    def send_message(self, message):
+        self.native.CoreWebView2.PostWebMessageAsString(message)
+
+    def receive_message(self, sender, args):
+        try:
+            message = args.TryGetWebMessageAsString()
+        except Exception:
+            message = "Could not read message as string."
+        self.interface.handle_js_msg(message)
 
     def get_url(self):
         source = self.native.Source

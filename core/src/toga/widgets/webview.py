@@ -67,6 +67,14 @@ class WebView(Widget):
             self.set_content(url, content)
         else:
             self.url = url
+        self.handle_py_msg_script = """
+        function handle_py_msg(message){
+            console.log(message);
+        }
+        """
+
+    def handle_js_msg(self, message):
+        print(message)
 
     def _create(self) -> Any:
         return self.factory.WebView(interface=self)
