@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - webview_bridge
   workflow_call:
     inputs:
       attest-package:
