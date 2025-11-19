@@ -23,7 +23,30 @@ class WebView(Widget):
                 "for details."
             )
 
-        self.native = WebKit2.WebView()
+        self.content_manager = WebKit2.UserContentManager()
+        self.content_manager.register_script_message_handler("webview_message_handler")
+        self.content_manager.connect(
+            "script-message-received::webview_message_handler", self.receive_message
+        )
+        self.content_manager.add_script(
+            WebKit2.UserScript.new(
+                """
+                function receive_message(message) {
+                    handle_py_message(message);
+                }
+                function send_message(message) {
+                    webkit.messageHandlers.webview_message_handler.postMessage(message);
+                }
+                """
+                + self.interface.handle_py_msg_script
+            ),
+            WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+            WebKit2.UserScriptInjectionTime.START,
+        )
+
+        self.native = WebKit2.WebView.new_with_user_content_manager(
+            self.content_manager
+        )
 
         settings = self.native.get_settings()
         settings.set_property("enable-developer-extras", True)
@@ -38,6 +61,16 @@ class WebView(Widget):
         self.native.connect("load-changed", self.gtk_on_load_changed)
 
         self.load_future = None
+
+    def send_message(self, message):
+        js_message = f"handle_py_msg({message})"
+        self.native.evaluate_javascript(
+            js_message, len(js_message), None, None, None, None
+        )
+
+    def receive_message(self, webview, js_message):
+        message = js_message.get_js_value().to_string()
+        self.interface.handle_js_msg(message)
 
     def gtk_on_load_changed(self, widget, load_event, *args):
         if load_event == WebKit2.LoadEvent.FINISHED:
