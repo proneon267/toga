@@ -54,6 +54,11 @@ class WebView(Widget):
             finishes loading.
         :param kwargs: Initial style properties.
         """
+        self.handle_py_msg_script = """
+        function handle_py_msg(message){
+            console.log(message);
+        }
+        """
         super().__init__(id, style, **kwargs)
 
         self.user_agent = user_agent
@@ -67,12 +72,6 @@ class WebView(Widget):
             self.set_content(url, content)
         else:
             self.url = url
-
-        self.handle_py_msg_script = """
-        function handle_py_msg(message){
-            console.log(message);
-        }
-        """
 
     def handle_js_msg(self, message):
         print(message)

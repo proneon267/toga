@@ -1,3 +1,4 @@
+import json
 from http.cookiejar import CookieJar
 
 from travertino.size import at_least
@@ -38,10 +39,10 @@ class WebView(Widget):
                     webkit.messageHandlers.webview_message_handler.postMessage(message);
                 }
                 """
-                + self.interface.handle_py_msg_script
-            ),
-            WebKit2.UserContentInjectedFrames.ALL_FRAMES,
-            WebKit2.UserScriptInjectionTime.START,
+                + self.interface.handle_py_msg_script,
+                WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit2.UserScriptInjectionTime.START,
+            )
         )
 
         self.native = WebKit2.WebView.new_with_user_content_manager(
@@ -63,7 +64,7 @@ class WebView(Widget):
         self.load_future = None
 
     def send_message(self, message):
-        js_message = f"handle_py_msg({message})"
+        js_message = f"handle_py_msg({json.dumps(message)});"
         self.native.evaluate_javascript(
             js_message, len(js_message), None, None, None, None
         )
