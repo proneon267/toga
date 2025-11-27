@@ -95,7 +95,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v5.0.0
+      uses: actions/checkout@v6.0.0
       with:
         fetch-depth: 0
 
@@ -120,7 +120,7 @@ jobs:
         # The $(ls ...) shell expansion is done in the GitHub environment; the value of
         # TOGA_INSTALL_COMMAND will be a literal string without any shell expansions to
         # perform.
-        export TOGA_INSTALL_COMMAND="uv pip install ../$(ls dist/toga_core-*.whl) ../$(ls dist/travertino-*.whl) ../$(ls dist/toga_dummy-*.whl) --group dev"
+        export TOGA_INSTALL_COMMAND="uv pip install ../$(ls dist/toga_core-*.whl) ../$(ls dist/travertino-*.whl) ../$(ls dist/toga_dummy-*.whl) --group test"
         tox -e py-cov${{ matrix.tox-suffix }}
         tox -qe coverage$(tr -dc "0-9" <<< "${{ matrix.python-version }}")${{ matrix.tox-suffix }}
         mv ${{ matrix.package }}/.coverage ${{ matrix.package }}/.coverage.${{ matrix.platform }}.${{ matrix.python-version }}
@@ -147,7 +147,7 @@ jobs:
             tox-suffix: "-trav"
     steps:
     - name: Checkout
-      uses: actions/checkout@v5.0.0
+      uses: actions/checkout@v6.0.0
       with:
         fetch-depth: 0
 
@@ -185,7 +185,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v5.0.0
+      uses: actions/checkout@v6.0.0
       with:
         fetch-depth: 0
 
@@ -464,7 +464,7 @@ jobs:
       uses: smorimoto/tune-github-hosted-runner-network@v1.0.0
 
     - name: Checkout
-      uses: actions/checkout@v5.0.0
+      uses: actions/checkout@v6.0.0
       with:
         fetch-depth: 0
 
@@ -549,7 +549,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v5.0.0
+      uses: actions/checkout@v6.0.0
       with:
         fetch-depth: 0
 
