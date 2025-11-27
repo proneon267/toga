@@ -57,6 +57,7 @@ class WebView(Widget):
         self.handle_py_msg_script = """
         function handle_py_msg(message){
             console.log(message);
+            send_message(message);
         }
         """
         super().__init__(id, style, **kwargs)

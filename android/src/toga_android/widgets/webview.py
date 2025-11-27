@@ -3,8 +3,16 @@ from http.cookiejar import CookieJar
 
 from android.webkit import ValueCallback, WebView as A_WebView, WebViewClient
 from java import dynamic_proxy
+from java.util import Set
 
 from toga.widgets.webview import CookiesResult, JavaScriptResult
+
+try:
+    from androidx.webkit import WebViewCompat
+except ImportError:  # pragma: no cover
+    # Import will fail if WebViewCompat is not listed in dependencies
+    # No cover due to not being able to test in CI
+    WebViewCompat = None
 
 from .base import Widget
 
@@ -23,6 +31,17 @@ class ReceiveString(dynamic_proxy(ValueCallback)):
         self.result.set_result(res)
 
 
+if WebViewCompat is not None:  # pragma: no cover
+
+    class ReceiveMessage(dynamic_proxy(WebViewCompat.WebMessageListener)):
+        def __init__(self, webview):
+            super().__init__()
+            self.webview = webview
+
+        def onPostMessage(self, view, message, sourceOrigin, isMainFrame, replyProxy):
+            self.webview.interface.handle_js_msg(message.getData())
+
+
 class WebView(Widget):
     SUPPORTS_ON_WEBVIEW_LOAD = False
 
@@ -39,6 +58,36 @@ class WebView(Widget):
         # enable pinch-to-zoom without the deprecated on-screen controls
         self.settings.setBuiltInZoomControls(True)
         self.settings.setDisplayZoomControls(False)
+        if WebViewCompat is None:  # pragma: no cover
+            raise RuntimeError(
+                "Unable to import WebViewCompat. Ensure that the AndroidX "
+                "Webkit package (androidx.webkit:webkit:1.14.0) is listed in "
+                "your app's dependencies."
+            )
+        WebViewCompat.addWebMessageListener(
+            self.native,
+            "WebviewMessageHandler",
+            Set.of("*"),
+            ReceiveMessage(self),
+        )
+        self.bridge_script = (
+            """
+            function receive_message(message) {
+                handle_py_msg(message);
+            }
+            function send_message(message) {
+                //console.log(webkit);
+                WebviewMessageHandler.postMessage(message);
+            }
+            """
+            + self.interface.handle_py_msg_script
+        )
+        self.native.evaluateJavascript(self.bridge_script, None)
+
+    def send_message(self, message):
+        self.native.evaluateJavascript(self.bridge_script, None)
+        js_message = f"receive_message({json.dumps(message)});"
+        self.native.evaluateJavascript(js_message, None)
 
     def get_url(self):
         url = self.native.getUrl()

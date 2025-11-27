@@ -64,7 +64,7 @@ class WebView(Widget):
         self.load_future = None
 
     def send_message(self, message):
-        js_message = f"handle_py_msg({json.dumps(message)});"
+        js_message = f"receive_message({json.dumps(message)});"
         self.native.evaluate_javascript(
             js_message, len(js_message), None, None, None, None
         )
