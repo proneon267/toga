@@ -203,7 +203,7 @@ class WebView(Widget):
             WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
                 """
                 function receive_message(message) {
-                    handle_py_message(message);
+                    handle_py_msg(message);
                 }
                 function send_message(message) {
                     webkit.messageHandlers.webview_message_handler.postMessage(message);
@@ -237,7 +237,7 @@ class WebView(Widget):
 
     def send_message(self, message):
         js_message = f"receive_message({json.dumps(message)});"
-        self.native.evaluateJavaScript(js_message, None)
+        self.evaluate_javascript(js_message, None)
 
     def get_url(self):
         url = str(self.native.URL)

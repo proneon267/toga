@@ -41,7 +41,7 @@ class WebView(Widget):
             WebKit2.UserScript.new(
                 """
                 function receive_message(message) {
-                    handle_py_message(message);
+                    handle_py_msg(message);
                 }
                 function send_message(message) {
                     webkit.messageHandlers.webview_message_handler.postMessage(message);
