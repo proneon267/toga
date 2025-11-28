@@ -1,4 +1,5 @@
 import json
+import os
 from http.cookiejar import CookieJar
 
 from travertino.size import at_least
@@ -23,6 +24,13 @@ class WebView(Widget):
                 "https://toga.beeware.org/en/stable/reference/api/widgets/mapview#system-requirements "  # noqa: E501
                 "for details."
             )
+
+        # Access to SharedArrayBuffer is restricted by WebKit for security
+        # reasons. Although access *should* be determined by the serving page,
+        # access is *actually* controlled by an undocumented environment
+        # variable.
+        if os.getenv("JSC_useSharedArrayBuffer") is None:
+            os.environ["JSC_useSharedArrayBuffer"] = "1"
 
         self.content_manager = WebKit2.UserContentManager()
         self.content_manager.register_script_message_handler("webview_message_handler")
