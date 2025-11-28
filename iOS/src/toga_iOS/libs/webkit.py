@@ -14,5 +14,14 @@ webkit = cdll.LoadLibrary(util.find_library("WebKit"))
 WKWebView = ObjCClass("WKWebView")
 
 ######################################################################
+# WKUserScript.h
+WKUserScript = ObjCClass("WKUserScript")
+
+######################################################################
+# WKWebViewConfiguration.h
+WKWebViewConfiguration = ObjCClass("WKWebViewConfiguration")
+WKUserContentController = ObjCClass("WKUserContentController")
+
+######################################################################
 # WKFrameInfo.h
 WKUIDelegate = ObjCProtocol("WKUIDelegate")
