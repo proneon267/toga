@@ -1,3 +1,4 @@
+import json
 from http.cookiejar import Cookie, CookieJar
 
 from rubicon.objc import ObjCBlock, objc_id, objc_method, objc_property, py_from_ns
@@ -7,11 +8,16 @@ from toga.widgets.webview import CookiesResult, JavaScriptResult
 
 from ..libs import (
     NSURL,
+    NSMakeRect,
     NSModalResponseOK,
+    NSObject,
     NSOpenPanel,
     NSURLRequest,
     WKUIDelegate,
+    WKUserContentController,
+    WKUserScript,
     WKWebView,
+    WKWebViewConfiguration,
 )
 from .base import Widget
 
@@ -128,9 +134,52 @@ class TogaWebView(WKWebView, protocols=[WKUIDelegate]):
         open_panel.beginWithCompletionHandler(_completion_handler)
 
 
+class TogaScriptMessageHandler(NSObject):
+    interface = objc_property(object, weak=True)
+    impl = objc_property(object, weak=True)
+
+    @objc_method
+    def userContentController_didReceiveScriptMessage_(
+        self, userContentController, message
+    ) -> None:
+        self.interface.handle_js_msg(str(message.body))
+
+
 class WebView(Widget):
     def create(self):
-        self.native = TogaWebView.alloc().init()
+        configuration = WKWebViewConfiguration.alloc().init()
+        user_content_controller = WKUserContentController.alloc().init()
+        configuration.userContentController = user_content_controller
+
+        message_handler = TogaScriptMessageHandler.alloc().init()
+        message_handler.impl = self
+        message_handler.interface = self.interface
+
+        configuration.userContentController.addScriptMessageHandler(
+            message_handler,
+            name="webview_message_handler",
+        )
+
+        user_content_controller.addUserScript_(
+            WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
+                """
+                function receive_message(message) {
+                    handle_py_message(message);
+                }
+                function send_message(message) {
+                    webkit.messageHandlers.webview_message_handler.postMessage(message);
+                }
+                """
+                + self.interface.handle_py_msg_script,
+                0,  # WKUserScriptInjectionTimeAtDocumentStart
+                True,  # forMainFrameOnly
+            )
+        )
+        self.native = TogaWebView.alloc().initWithFrame(
+            # A dummy size that will be immediately updated by constraints
+            NSMakeRect(0, 0, 0, 0),
+            configuration=configuration,
+        )
         self.native.interface = self.interface
         self.native.impl = self
 
@@ -149,6 +198,10 @@ class WebView(Widget):
 
         # Add the layout constraints
         self.add_constraints()
+
+    def send_message(self, message):
+        js_message = f"receive_message({json.dumps(message)});"
+        self.native.evaluateJavaScript(js_message, None)
 
     def get_url(self):
         url = str(self.native.URL)
