@@ -8,11 +8,12 @@ from java.util import Set
 from toga.widgets.webview import CookiesResult, JavaScriptResult
 
 try:
-    from androidx.webkit import WebViewCompat
+    from androidx.webkit import WebViewCompat, WebViewFeature
 except ImportError:  # pragma: no cover
     # Import will fail if WebViewCompat is not listed in dependencies
     # No cover due to not being able to test in CI
     WebViewCompat = None
+    WebViewFeature = None
 
 from .base import Widget
 
@@ -58,6 +59,11 @@ class WebView(Widget):
         # enable pinch-to-zoom without the deprecated on-screen controls
         self.settings.setBuiltInZoomControls(True)
         self.settings.setDisplayZoomControls(False)
+
+        self.enable_bridge()
+        # self.disable_bridge()
+
+    def enable_bridge(self):
         if WebViewCompat is None:  # pragma: no cover
             raise RuntimeError(
                 "Unable to import WebViewCompat. Ensure that the AndroidX "
@@ -70,19 +76,27 @@ class WebView(Widget):
             Set.of("*"),
             ReceiveMessage(self),
         )
+
         self.bridge_script = (
             """
             function receive_message(message) {
                 handle_py_msg(message);
             }
             function send_message(message) {
-                //console.log(webkit);
                 WebviewMessageHandler.postMessage(message);
             }
             """
             + self.interface.handle_py_msg_script
         )
-        self.native.evaluateJavascript(self.bridge_script, None)
+        if WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT):
+            WebViewCompat.addDocumentStartJavaScript(
+                self.native, self.bridge_script, Set.of("*")
+            )
+        else:
+            self.evaluate_javascript(self.bridge_script)
+
+    def disable_bridge(self):
+        pass
 
     def send_message(self, message):
         self.native.evaluateJavascript(self.bridge_script, None)

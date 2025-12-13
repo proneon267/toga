@@ -1,5 +1,6 @@
 import json
 import webbrowser
+from concurrent.futures import Future
 from http.cookiejar import Cookie, CookieJar
 
 import System.Windows.Forms as WinForms
@@ -135,31 +136,8 @@ class WebView(Widget):
             settings.IsSwipeNavigationEnabled = False
             settings.IsZoomControlEnabled = True
 
-            bridge_script = (
-                """
-            function receive_message(event) {
-                message = event.data;
-                handle_py_msg(message);
-            }
-            function send_message(message) {
-                chrome.webview.postMessage(message);
-            }
-            chrome.webview.addEventListener('message', receive_message);
-            """
-                + self.interface.handle_py_msg_script
-            )
-
-            def callback(task):
-                self.bridge_script_id = task.Result
-
-            task_scheduler = TaskScheduler.FromCurrentSynchronizationContext()
-            self.native.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
-                bridge_script
-            ).ContinueWith(Action[Task[String]](callback), task_scheduler)
-            self.native.CoreWebView2.WebMessageReceived += WeakrefCallable(
-                self.receive_message
-            )
-
+            self.enable_bridge()
+            # self.disable_bridge()
             for task in self.pending_tasks:
                 task()
             self.pending_tasks = None
@@ -202,6 +180,43 @@ class WebView(Widget):
         if self.loaded_future:
             self.loaded_future.set_result(None)
             self.loaded_future = None
+
+    def enable_bridge(self):
+        bridge_script = (
+            """
+        function receive_message(event) {
+            message = event.data;
+            handle_py_msg(message);
+        }
+        function send_message(message) {
+            chrome.webview.postMessage(message);
+        }
+        chrome.webview.addEventListener('message', receive_message);
+        """
+            + self.interface.handle_py_msg_script
+        )
+        future = Future()
+
+        def callback(task):
+            future.set_result(task.Result)
+
+        task_scheduler = TaskScheduler.FromCurrentSynchronizationContext()
+        self.native.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+            bridge_script
+        ).ContinueWith(Action[Task[String]](callback), task_scheduler)
+        self.receive_message_callback = WeakrefCallable(self.receive_message)
+        self.native.CoreWebView2.WebMessageReceived += self.receive_message_callback
+        while not future.done():
+            WinForms.Application.DoEvents()
+        self.bridge_script_id = future.result()
+
+    def disable_bridge(self):
+        self.native.CoreWebView2.WebMessageReceived -= self.receive_message_callback
+        self.receive_message_callback = None
+        self.native.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(
+            self.bridge_script_id
+        )
+        self.bridge_script_id = None
 
     def send_message(self, message):
         self.native.CoreWebView2.PostWebMessageAsString(message)

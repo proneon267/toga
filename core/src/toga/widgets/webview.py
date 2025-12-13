@@ -25,6 +25,43 @@ class OnWebViewLoadHandler(Protocol):
         """
 
 
+class JsProxy:
+    def __init__(self, webview_bridge):
+        self.webview = webview_bridge
+
+
+class WebViewBridge:
+    def __init__(self, webview):
+        self.webview = webview
+        self.js = None
+
+    @property
+    def enabled(self):
+        return False if self.js is None else True
+
+    @enabled.setter
+    def enabled(self, value: bool):
+        if not self.enabled and value is True:
+            self.webview._impl.enable_bridge()
+            self.js = JsProxy(self)
+        elif self.enabled and value is False:
+            self.webview._impl.disable_bridge()
+            self.js = None
+
+    def register_method(self, method):
+        pass
+
+    handle_py_msg_script = """
+    function handle_py_msg(message){
+        console.log(message);
+        send_message(message);
+    }
+    """
+
+    def handle_js_msg(self, message):
+        print(message)
+
+
 class WebView(Widget):
     def __init__(
         self,
