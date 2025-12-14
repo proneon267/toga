@@ -37,7 +37,7 @@ class WebView(Widget):
             self.content_manager
         )
         self.enable_bridge()
-        # self.disable_bridge()
+        self.disable_bridge()
         settings = self.native.get_settings()
         settings.set_property("enable-developer-extras", True)
 
@@ -66,14 +66,12 @@ class WebView(Widget):
             webkit.messageHandlers.webview_message_handler.postMessage(message);
         }
         """
-            + self.interface.handle_py_msg_script
-        )
-
-        self.content_manager.add_script(
-            self.bridge_script,
+            + self.interface.handle_py_msg_script,
             WebKit2.UserContentInjectedFrames.ALL_FRAMES,
             WebKit2.UserScriptInjectionTime.START,
         )
+
+        self.content_manager.add_script(self.bridge_script)
 
     def disable_bridge(self):
         self.content_manager.unregister_script_message_handler(
