@@ -37,7 +37,7 @@ class WebView(Widget):
             self.content_manager
         )
         self.enable_bridge()
-        self.disable_bridge()
+        # self.disable_bridge()
         settings = self.native.get_settings()
         settings.set_property("enable-developer-extras", True)
 
