@@ -11,16 +11,13 @@ from ..libs import (
     NSAlert,
     NSAlertFirstButtonReturn,
     NSAlertStyle,
-    NSMakeRect,
     NSModalResponseOK,
     NSObject,
     NSOpenPanel,
     NSURLRequest,
     WKUIDelegate,
-    WKUserContentController,
     WKUserScript,
     WKWebView,
-    WKWebViewConfiguration,
 )
 from .base import Widget
 
@@ -189,41 +186,7 @@ class TogaScriptMessageHandler(NSObject):
 
 class WebView(Widget):
     def create(self):
-        configuration = WKWebViewConfiguration.alloc().init()
-        user_content_controller = WKUserContentController.alloc().init()
-        configuration.preferences.setValue_forKey_(True, "developerExtrasEnabled")
-
-        configuration.userContentController = user_content_controller
-
-        message_handler = TogaScriptMessageHandler.alloc().init()
-        message_handler.impl = self
-        message_handler.interface = self.interface
-
-        configuration.userContentController.addScriptMessageHandler(
-            message_handler,
-            name="webview_message_handler",
-        )
-
-        user_content_controller.addUserScript_(
-            WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-                """
-                function receive_message(message) {
-                    handle_py_msg(message);
-                }
-                function send_message(message) {
-                    webkit.messageHandlers.webview_message_handler.postMessage(message);
-                }
-                """
-                + self.interface.handle_py_msg_script,
-                0,  # WKUserScriptInjectionTimeAtDocumentStart
-                True,  # forMainFrameOnly
-            )
-        )
-        self.native = TogaWebView.alloc().initWithFrame(
-            # A dummy size that will be immediately updated by constraints
-            NSMakeRect(0, 0, 0, 0),
-            configuration=configuration,
-        )
+        self.native = TogaWebView.alloc().init()
         self.native.interface = self.interface
         self.native.impl = self
 
@@ -235,6 +198,9 @@ class WebView(Widget):
         # from the command line.
         self.native.inspectable = True
         self.native.navigationDelegate = self.native
+        self.native.configuration.preferences.setValue(
+            True, forKey="developerExtrasEnabled"
+        )
         # Set UIDelegate to self for file dialog support
         self.native.UIDelegate = self.native
 
@@ -242,6 +208,40 @@ class WebView(Widget):
 
         # Add the layout constraints
         self.add_constraints()
+        self.enable_bridge()
+        # self.disable_bridge()
+
+    def enable_bridge(self):
+        message_handler = TogaScriptMessageHandler.alloc().init()
+        message_handler.impl = self
+        message_handler.interface = self.interface
+
+        self.native.configuration.userContentController.addScriptMessageHandler(
+            message_handler,
+            name="webview_message_handler",
+        )
+
+        self.native.configuration.userContentController.addUserScript(
+            WKUserScript.alloc().initWithSource(
+                """
+                function receive_message(message) {
+                    handle_py_msg(message);
+                }
+                function send_message(message) {
+                    webkit.messageHandlers.webview_message_handler.postMessage(message);
+                }
+                """
+                + self.interface.handle_py_msg_script,
+                injectionTime=0,  # WKUserScriptInjectionTimeAtDocumentStart
+                forMainFrameOnly=True,
+            )
+        )
+
+    def disable_bridge(self):
+        self.native.configuration.userContentController.removeScriptMessageHandlerForName(
+            "webview_message_handler"
+        )
+        self.native.configuration.userContentController.removeAllUserScripts()
 
     def send_message(self, message):
         js_message = f"receive_message({json.dumps(message)});"
