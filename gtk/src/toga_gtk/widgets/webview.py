@@ -4,10 +4,64 @@ from http.cookiejar import CookieJar
 
 from travertino.size import at_least
 
-from toga.widgets.webview import CookiesResult, JavaScriptResult
+from toga.widgets.webview import (
+    CookiesResult,
+    JavaScriptResult,
+    WebviewBridge as WebviewBridgeInterface,
+)
 
 from ..libs import GTK_VERSION, GLib, WebKit2
 from .base import Widget
+
+
+class WebviewBridge:
+    def __init__(self, webview):
+        self.webview = webview
+        self.native = webview.native
+        self.interface = None
+        self.enabled = False
+
+    def enable_bridge(self):
+        self.webview.content_manager.register_script_message_handler(
+            "webview_message_handler"
+        )
+        self.receive_message_callback = self.webview.content_manager.connect(
+            "script-message-received::webview_message_handler", self.receive_message
+        )
+        self.bridge_script = WebKit2.UserScript.new(
+            """
+        function receive_message(message) {
+            handle_py_msg(message);
+        }
+        function send_message(message) {
+            webkit.messageHandlers.webview_message_handler.postMessage(message);
+        }
+        """
+            + self.interface.handle_py_msg_script,
+            WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+            WebKit2.UserScriptInjectionTime.START,
+        )
+
+        self.webview.content_manager.add_script(self.bridge_script)
+
+    def disable_bridge(self):
+        self.webview.content_manager.unregister_script_message_handler(
+            "webview_message_handler"
+        )
+        self.webview.content_manager.disconnect(self.receive_message_callback)
+        self.receive_message_callback = None
+        self.webview.content_manager.remove_script(self.bridge_script)
+        self.bridge_script = None
+
+    def send_message(self, message):
+        js_message = f"receive_message({json.dumps(message)});"
+        self.native.evaluate_javascript(
+            js_message, len(js_message), None, None, None, None
+        )
+
+    def receive_message(self, webview, js_message):
+        message = js_message.get_js_value().to_string()
+        self.interface.handle_js_msg(message)
 
 
 class WebView(Widget):
@@ -36,8 +90,11 @@ class WebView(Widget):
         self.native = WebKit2.WebView.new_with_user_content_manager(
             self.content_manager
         )
-        self.enable_bridge()
-        # self.disable_bridge()
+
+        # Set up the bridge both on the core and impl layer
+        self.bridge = WebviewBridge(self)
+        self.bridge.interface = WebviewBridgeInterface(self.bridge, self.interface)
+
         settings = self.native.get_settings()
         settings.set_property("enable-developer-extras", True)
 
@@ -51,46 +108,6 @@ class WebView(Widget):
         self.native.connect("load-changed", self.gtk_on_load_changed)
 
         self.load_future = None
-
-    def enable_bridge(self):
-        self.content_manager.register_script_message_handler("webview_message_handler")
-        self.receive_message_callback = self.content_manager.connect(
-            "script-message-received::webview_message_handler", self.receive_message
-        )
-        self.bridge_script = WebKit2.UserScript.new(
-            """
-        function receive_message(message) {
-            handle_py_msg(message);
-        }
-        function send_message(message) {
-            webkit.messageHandlers.webview_message_handler.postMessage(message);
-        }
-        """
-            + self.interface.handle_py_msg_script,
-            WebKit2.UserContentInjectedFrames.ALL_FRAMES,
-            WebKit2.UserScriptInjectionTime.START,
-        )
-
-        self.content_manager.add_script(self.bridge_script)
-
-    def disable_bridge(self):
-        self.content_manager.unregister_script_message_handler(
-            "webview_message_handler"
-        )
-        self.content_manager.disconnect(self.receive_message_callback)
-        self.receive_message_callback = None
-        self.content_manager.remove_script(self.bridge_script)
-        self.bridge_script = None
-
-    def send_message(self, message):
-        js_message = f"receive_message({json.dumps(message)});"
-        self.native.evaluate_javascript(
-            js_message, len(js_message), None, None, None, None
-        )
-
-    def receive_message(self, webview, js_message):
-        message = js_message.get_js_value().to_string()
-        self.interface.handle_js_msg(message)
 
     def gtk_on_load_changed(self, widget, load_event, *args):
         if load_event == WebKit2.LoadEvent.FINISHED:

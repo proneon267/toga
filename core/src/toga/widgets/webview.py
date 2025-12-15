@@ -30,23 +30,22 @@ class JsProxy:
         self.webview = webview_bridge
 
 
-class WebViewBridge:
-    def __init__(self, webview):
+class WebviewBridge:
+    def __init__(self, _impl, webview):
+        self._impl = _impl
         self.webview = webview
+        self.webview.bridge = self
         self.js = None
 
     @property
     def enabled(self):
-        return False if self.js is None else True
+        return self._impl.enabled
 
-    @enabled.setter
-    def enabled(self, value: bool):
-        if not self.enabled and value is True:
-            self.webview._impl.enable_bridge()
-            self.js = JsProxy(self)
-        elif self.enabled and value is False:
-            self.webview._impl.disable_bridge()
-            self.js = None
+    async def enable_bridge(self):
+        await self._impl.enable_bridge()
+
+    async def disable_bridge(self):
+        await self._impl.disable_bridge()
 
     def register_method(self, method):
         pass
@@ -91,12 +90,9 @@ class WebView(Widget):
             finishes loading.
         :param kwargs: Initial style properties.
         """
-        self.handle_py_msg_script = """
-        function handle_py_msg(message){
-            console.log(message);
-            send_message(message);
-        }
-        """
+        # Bridge will be set up by the impl layer
+        self.bridge = None
+
         super().__init__(id, style, **kwargs)
 
         self.user_agent = user_agent
@@ -110,9 +106,6 @@ class WebView(Widget):
             self.set_content(url, content)
         else:
             self.url = url
-
-    def handle_js_msg(self, message):
-        print(message)
 
     def _create(self) -> Any:
         return self.factory.WebView(interface=self)
